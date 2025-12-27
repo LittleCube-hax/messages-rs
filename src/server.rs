@@ -4,6 +4,7 @@ pub mod server
 	
 	use std::collections::HashSet;
 	use std::io::Read;
+	use std::io::Write;
 	use std::net::TcpStream;
 	
 	use num_derive::FromPrimitive;
@@ -30,7 +31,6 @@ pub mod server
 	
 	pub struct Topic
 	{
-		index: usize,
 		key: u32,
 		subscribers: HashSet<usize>
 	}
@@ -79,7 +79,7 @@ pub mod server
 							
 							else
 							{
-								let topic: Topic = Topic{index: self.next_topic_index, key: topic_key, subscribers: HashSet::new()};
+								let topic: Topic = Topic{key: topic_key, subscribers: HashSet::new()};
 								self.topics.push(topic);
 								self.topic_map.set(&self.topics.last().unwrap().key, self.next_topic_index);
 								topic_index = self.next_topic_index;
@@ -98,6 +98,12 @@ pub mod server
 								let mut data: Vec<u8> = Vec::new();
 								data.resize(usize::from_u32(data_size).unwrap(), 0);
 								let _ = c.read(&mut data);
+								
+								for sub_i in &self.topics[topic_index].subscribers
+								{
+									let sub: &mut TcpStream = &mut self.clients[*sub_i];
+									let _ = sub.write(&data);
+								}
 							}
 							
 							else
