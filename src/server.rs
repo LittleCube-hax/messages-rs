@@ -12,7 +12,8 @@ use num_traits::FromPrimitive;
 pub enum Command
 {
 	Subscribe = 0,
-	Publish = 1
+	Publish = 1,
+	Message = 2
 }
 
 fn u32_to_cmd(word: u32) -> Option<Command>
@@ -97,18 +98,19 @@ impl Server
 							data.resize(usize::from_u32(data_size).unwrap(), 0);
 							let _ = c.read(&mut data);
 							
-							for sub_i in &self.topics[topic_index].subscribers
-							{
-								let sub: &mut TcpStream = &mut self.clients[*sub_i];
-								let _ = sub.write(&data);
-							}
+							self.send_message(topic_key, topic_index, &data, data_size);
 						}
 						
 						else
 						{
 							// TODO: handle when the topic doesn't exist
-							unreachable!();
+							unimplemented!();
 						}
+					},
+					_ =>
+					{
+						// TODO: kill the connection if other command received
+						unimplemented!();
 					}
 				};
 			}
@@ -116,8 +118,21 @@ impl Server
 			else
 			{
 				// TODO: kill the connection if bad command received
-				unreachable!();
+				unimplemented!();
 			}
+		}
+	}
+	
+	pub fn send_message(&mut self, topic_key: u32, topic_index: usize, data: &Vec<u8>, data_size: u32)
+	{
+		for sub_i in &self.topics[topic_index].subscribers
+		{
+			let sub: &mut TcpStream = &mut self.clients[*sub_i];
+			let message_cmd: u32 = Command::Message as u32;
+			let _ = sub.write(&message_cmd.to_le_bytes());
+			_ = sub.write(&topic_key.to_le_bytes());
+			_ = sub.write(&data_size.to_le_bytes());
+			_ = sub.write(&data);
 		}
 	}
 }
