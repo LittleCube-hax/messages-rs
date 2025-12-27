@@ -12,7 +12,8 @@ pub mod server
 	#[derive(FromPrimitive)]
 	pub enum Command
 	{
-		Subscribe = 0
+		Subscribe = 0,
+		Publish = 1
 	}
 	
 	fn u32_to_cmd(word: u32) -> Option<Command>
@@ -86,6 +87,24 @@ pub mod server
 							}
 							
 							self.topics[topic_index].subscribers.insert(i);
+						},
+						Command::Publish =>
+						{
+							let topic_key: u32 = read_word(c);
+							let data_size: u32 = read_word(c);
+							
+							if let Some(topic_index) = self.topic_map.get(&topic_key)
+							{
+								let mut data: Vec<u8> = Vec::new();
+								data.resize(usize::from_u32(data_size).unwrap(), 0);
+								let _ = c.read(&mut data);
+							}
+							
+							else
+							{
+								// TODO: handle when the topic doesn't exist
+								unreachable!();
+							}
 						}
 					};
 				}
