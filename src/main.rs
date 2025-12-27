@@ -1,7 +1,7 @@
 mod server;
 mod c_hashmap;
 
-use server::server::Server;
+use server::Server;
 
 use std::net::TcpListener;
 
