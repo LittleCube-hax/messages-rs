@@ -4,8 +4,8 @@ use libc::size_t;
 unsafe extern "C"
 {
 	fn hashmap_create() -> u64;
-	fn hashmap_get(map: u64, key: *const u32, ksize: size_t, out_val: *mut u64) -> i32;
-	fn hashmap_set(map: u64, key: *const u32, ksize: size_t, value: u64) -> i32;
+	fn hashmap_get(map: u64, key: *const u32, ksize: size_t, out_val: *mut usize) -> i32;
+	fn hashmap_set(map: u64, key: *const u32, ksize: size_t, value: usize) -> i32;
 	fn hashmap_free(map: u64);
 }
 
@@ -24,19 +24,23 @@ impl CMap
 		}
 	}
 	
-	pub fn get(&self, key: &u32) -> u64
+	pub fn get(&self, key: &u32) -> Option<usize>
 	{
-		let mut value: u64 = 0xFFFFFFFFFFFFFFFF;
+		let mut value: usize = 0xFFFFFFFFFFFFFFFF;
+		
+		let result: i32;
 		
 		unsafe
 		{
-			hashmap_get(self.map, key as *const u32, 4, &mut value);
+			result = hashmap_get(self.map, key as *const u32, 4, &mut value);
 		}
 		
-		return value;
+		let ret: Option<usize> = if result != 0 { Some(value) } else { None };
+		
+		return ret;
 	}
 	
-	pub fn set(&self, key: &u32, value: u64) -> i32
+	pub fn set(&self, key: &u32, value: usize) -> i32
 	{
 		unsafe
 		{

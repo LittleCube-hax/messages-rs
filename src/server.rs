@@ -2,6 +2,7 @@ pub mod server
 {
 	use crate::c_hashmap::CMap;
 	
+	use std::collections::HashSet;
 	use std::io::Read;
 	use std::net::TcpStream;
 	
@@ -28,14 +29,15 @@ pub mod server
 	
 	pub struct Topic
 	{
-		index: u64,
-		key: u32
+		index: usize,
+		key: u32,
+		subscribers: HashSet<usize>
 	}
 	
 	pub struct Server
 	{
 		pub clients: Vec<TcpStream>,
-		next_topic_index: u64,
+		next_topic_index: usize,
 		topics: Vec<Topic>,
 		topic_map: CMap
 	}
@@ -54,9 +56,10 @@ pub mod server
 		
 		pub fn iterate_clients(&mut self)
 		{
-			for mut c in &mut self.clients
+			for i in 0..self.clients.len()
 			{
-				let word: u32 = read_word(&mut c);
+				let c: &mut TcpStream = &mut self.clients[i];
+				let word: u32 = read_word(c);
 				let cmd_u32: Option<Command> = u32_to_cmd(word);
 				
 				if let Some(cmd) = cmd_u32
@@ -65,12 +68,24 @@ pub mod server
 					{
 						Command::Subscribe =>
 						{
-							println!("subscribe");
-							let topic_key: u32 = read_word(&mut c);
-							let topic: Topic = Topic{index: self.next_topic_index, key: topic_key};
-							self.topics.push(topic);
-							self.topic_map.set(&self.topics.last().unwrap().key, self.next_topic_index);
-							self.next_topic_index += 1;
+							let topic_key: u32 = read_word(c);
+							let topic_index: usize;
+							
+							if let Some(some_topic_index) = self.topic_map.get(&topic_key)
+							{
+								topic_index = some_topic_index;
+							}
+							
+							else
+							{
+								let topic: Topic = Topic{index: self.next_topic_index, key: topic_key, subscribers: HashSet::new()};
+								self.topics.push(topic);
+								self.topic_map.set(&self.topics.last().unwrap().key, self.next_topic_index);
+								topic_index = self.next_topic_index;
+								self.next_topic_index += 1;
+							}
+							
+							self.topics[topic_index].subscribers.insert(i);
 						}
 					};
 				}
