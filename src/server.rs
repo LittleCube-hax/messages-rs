@@ -21,6 +21,20 @@ fn u32_to_cmd(word: u32) -> Option<Command>
 	return Command::from_u32(word);
 }
 
+fn read_word_option(c: &mut TcpStream) -> Option<u32>
+{
+	let mut buf: [u8; 4] = [0; 4];
+	
+	let mut ret: Option<u32> = None;
+	
+	if let Ok(result) = c.read(&mut buf) && result != 0
+	{
+		ret = Some(u32::from_le_bytes(buf));
+	}
+	
+	return ret;
+}
+
 fn read_word(c: &mut TcpStream) -> u32
 {
 	let mut buf: [u8; 4] = [0; 4];
@@ -56,13 +70,26 @@ impl Server
 	
 	pub fn iterate_clients(&mut self)
 	{
+		let mut disconnected: Vec<usize> = Vec::new();
+		
 		for i in 0..self.clients.len()
 		{
 			let c: &mut TcpStream = &mut self.clients[i];
-			let word: u32 = read_word(c);
-			let cmd_u32: Option<Command> = u32_to_cmd(word);
+			let word_option: Option<u32> = read_word_option(c);
+			let mut _cmd_u32: Option<Command> = None;
 			
-			if let Some(cmd) = cmd_u32
+			if let Some(w) = word_option
+			{
+				_cmd_u32 = u32_to_cmd(w);
+			}
+			
+			else
+			{
+				disconnected.push(i);
+				continue;
+			}
+			
+			if let Some(cmd) = _cmd_u32
 			{
 				match cmd
 				{
@@ -120,6 +147,11 @@ impl Server
 				// TODO: kill the connection if bad command received
 				unimplemented!();
 			}
+		}
+		
+		for c_i in disconnected
+		{
+			self.clients.remove(c_i);
 		}
 	}
 	
