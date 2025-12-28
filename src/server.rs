@@ -151,7 +151,22 @@ impl Server
 		
 		for c_i in disconnected
 		{
-			self.clients.remove(c_i);
+			let _ = self.clients.swap_remove(c_i);
+			let c_len = self.clients.len();
+			
+			for t in &mut self.topics
+			{
+				if t.subscribers.contains(&c_len)
+				{
+					t.subscribers.remove(&c_len);
+					t.subscribers.insert(c_i);
+				}
+				
+				else if t.subscribers.contains(&c_i)
+				{
+					t.subscribers.remove(&c_i);
+				}
+			}
 		}
 	}
 	
