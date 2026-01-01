@@ -3,6 +3,8 @@ use crate::c_hashmap::CMap;
 use std::collections::HashSet;
 use std::io::Read;
 use std::io::Write;
+use std::io::Error;
+use std::io::ErrorKind;
 use std::net::TcpStream;
 
 use num_derive::FromPrimitive;
@@ -21,18 +23,31 @@ fn u32_to_cmd(word: u32) -> Option<Command>
 	return Command::from_u32(word);
 }
 
-fn read_word_option(c: &mut TcpStream) -> Option<u32>
+fn read_word_option(c: &mut TcpStream) -> Result<u32, Error>
 {
 	let mut buf: [u8; 4] = [0; 4];
 	
-	let mut ret: Option<u32> = None;
+	let result_option: Result<usize, Error> = c.read(&mut buf);
 	
-	if let Ok(result) = c.read(&mut buf) && result != 0
+	if let Ok(result) = result_option && result != 0
 	{
-		ret = Some(u32::from_le_bytes(buf));
+		return Ok(u32::from_le_bytes(buf));
 	}
 	
-	return ret;
+	else if let Ok(result) = result_option && result == 0
+	{
+		return Err(Error::from(ErrorKind::Other));
+	}
+	
+	else if let Err(result) = result_option
+	{
+		return Err(result);
+	}
+	
+	else
+	{
+		unreachable!();
+	}
 }
 
 fn read_word(c: &mut TcpStream) -> u32
@@ -75,18 +90,27 @@ impl Server
 		for i in 0..self.clients.len()
 		{
 			let c: &mut TcpStream = &mut self.clients[i];
-			let word_option: Option<u32> = read_word_option(c);
+			let _ = c.set_nonblocking(true);
+			let word_result: Result<u32, Error> = read_word_option(c);
+			_ = c.set_nonblocking(false);
 			let mut _cmd_u32: Option<Command> = None;
 			
-			if let Some(w) = word_option
+			match word_result
 			{
-				_cmd_u32 = u32_to_cmd(w);
-			}
-			
-			else
-			{
-				disconnected.push(i);
-				continue;
+				Ok(w) =>
+				{
+					_cmd_u32 = u32_to_cmd(w);
+				},
+				
+				Err(e) =>
+				{
+					if e.kind() == ErrorKind::Other
+					{
+						disconnected.push(i);
+					}
+					
+					continue;
+				}
 			}
 			
 			if let Some(cmd) = _cmd_u32
@@ -114,6 +138,7 @@ impl Server
 						
 						self.topics[topic_index].subscribers.insert(i);
 					},
+					
 					Command::Publish =>
 					{
 						let topic_key: u32 = read_word(c);
@@ -134,6 +159,7 @@ impl Server
 							unimplemented!();
 						}
 					},
+					
 					_ =>
 					{
 						// TODO: kill the connection if other command received
